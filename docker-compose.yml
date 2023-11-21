@@ -1,0 +1,61 @@
+version: '3.8'
+services:
+  mongo:
+    container_name: hsa5_mongo
+    image: mongodb/mongodb-community-server:7.0.3-ubi8
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=pass
+      - MONGO_INITDB_DATABASE=hsa5
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - mongo_network
+    restart: always
+  
+  web:
+    container_name: hsa5_web
+    platform: linux/x86_64
+    build: ./application
+    working_dir: /application
+    environment:
+      - FLASK_DEBUG=1
+      - MONGO_URI=mongodb://admin:pass@mongo:27017/?authSource=admin
+    volumes:
+      - ./application:/application:rw
+    ports:
+      - 5000:5000
+    links:
+      - mongo
+    depends_on:
+      - mongo
+    networks:
+      - mongo_network
+    restart: always
+    command: flask run
+
+  siege:
+    container_name: hsa5_siege
+    platform: linux/x86_64
+    build: ./siege
+    working_dir: /siege
+    volumes:
+      - ./siege:/siege:rw
+      - ./siege/siege.conf:/root/.siege/siege.conf:ro
+    links:
+      - web
+    depends_on:
+      - mongo
+      - web
+    networks:
+      - mongo_network
+    command: sh siege.sh
+
+volumes:
+  mongo_data: {}
+
+networks:
+  mongo_network:
+    driver: bridge
